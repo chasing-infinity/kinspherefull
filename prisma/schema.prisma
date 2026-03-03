@@ -1,0 +1,249 @@
+// KinSphere HRMS – Prisma Schema
+// Bipolar Factory
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  EMPLOYEE
+}
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+enum EmployeeStatus {
+  ACTIVE
+  OFFBOARDED
+}
+enum LeaveType {
+  SICK
+  CASUAL
+  PAID
+  UNPAID
+}
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+enum AssetStatus {
+  ASSIGNED
+  RETURNED
+  LOST
+}
+enum OnboardingStatus {
+  PENDING
+  COMPLETED
+}
+enum PayslipStatus {
+  GENERATED
+  VIEWED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(EMPLOYEE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile           EmployeeProfile?
+  sessions          Session[]
+  givenRecognitions Recognition[]  @relation("GivenBy")
+  leaveApprovals    LeaveRequest[] @relation("ApprovedBy")
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("sessions")
+}
+
+model Department {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  createdAt DateTime          @default(now())
+  employees EmployeeProfile[]
+  @@map("departments")
+}
+
+model EmployeeProfile {
+  id             String         @id @default(cuid())
+  userId         String         @unique
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeCode   String         @unique
+  firstName      String
+  lastName       String
+  phone          String?
+  dateOfBirth    DateTime?
+  joiningDate    DateTime
+  employmentType EmploymentType @default(FULL_TIME)
+  salary         Decimal?       @db.Decimal(12, 2)
+  status         EmployeeStatus @default(ACTIVE)
+  deletedAt      DateTime?
+  departmentId   String?
+  department     Department?    @relation(fields: [departmentId], references: [id])
+  managerId      String?
+  manager        EmployeeProfile?  @relation("Reports", fields: [managerId], references: [id])
+  reports        EmployeeProfile[] @relation("Reports")
+  avatarUrl      String?
+  bio            String?
+  leaveRequests        LeaveRequest[]
+  leaveBalances        LeaveBalance[]
+  assets               Asset[]
+  onboardingChecklist  OnboardingChecklist?
+  receivedRecognitions Recognition[] @relation("ReceivedBy")
+  payrollConfig        PayrollConfig?
+  payslips             Payslip[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("employee_profiles")
+}
+
+model LeaveBalance {
+  id         String          @id @default(cuid())
+  employeeId String
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType  LeaveType
+  year       Int
+  total      Int             @default(0)
+  used       Int             @default(0)
+  pending    Int             @default(0)
+  @@unique([employeeId, leaveType, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String          @id @default(cuid())
+  employeeId   String
+  employee     EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType    LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  days         Int
+  reason       String
+  status       LeaveStatus     @default(PENDING)
+  note         String?
+  approvedById String?
+  approvedBy   User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  @@map("leave_requests")
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  description String?
+  isOptional  Boolean  @default(false)
+  @@map("holidays")
+}
+
+model Recognition {
+  id           String          @id @default(cuid())
+  message      String
+  givenById    String
+  givenBy      User            @relation("GivenBy", fields: [givenById], references: [id])
+  receivedById String
+  receivedBy   EmployeeProfile @relation("ReceivedBy", fields: [receivedById], references: [id])
+  isPublic     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  @@map("recognitions")
+}
+
+model OnboardingChecklist {
+  id                 String          @id @default(cuid())
+  employeeId         String          @unique
+  employee           EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  documentUploaded   Boolean         @default(false)
+  assetAssigned      Boolean         @default(false)
+  policyAcknowledged Boolean         @default(false)
+  status             OnboardingStatus @default(PENDING)
+  completedAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  @@map("onboarding_checklists")
+}
+
+model Asset {
+  id          String          @id @default(cuid())
+  name        String
+  assetTag    String          @unique
+  description String?
+  employeeId  String?
+  employee    EmployeeProfile? @relation(fields: [employeeId], references: [id])
+  status      AssetStatus     @default(ASSIGNED)
+  assignedAt  DateTime?
+  returnedAt  DateTime?
+  @@map("assets")
+}
+
+// ─── PAYROLL ──────────────────────────────────────
+
+/// Admin configures this once per employee. Drives all future payslip generation.
+model PayrollConfig {
+  id         String          @id @default(cuid())
+  employeeId String          @unique
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  annualCTC      Decimal @db.Decimal(12, 2)   // e.g. 1200000
+  basicPercent   Decimal @db.Decimal(5, 2)    // e.g. 40.00  → 40% of CTC/12 = Basic
+  hraPercent     Decimal @db.Decimal(5, 2)    // e.g. 20.00  → 20% of CTC/12 = HRA
+  // Other Allowances = (100 - basic - hra)% of monthly CTC
+
+  pfDeduction     Decimal @default(0) @db.Decimal(10, 2)
+  professionalTax Decimal @default(0) @db.Decimal(10, 2)
+  incomeTax       Decimal @default(0) @db.Decimal(10, 2)
+
+  effectiveFrom DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("payroll_configs")
+}
+
+/// One record per employee per month. Generated on the 15th automatically.
+model Payslip {
+  id         String          @id @default(cuid())
+  employeeId String
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  month Int   // 1–12
+  year  Int
+
+  basicSalary     Decimal @db.Decimal(10, 2)
+  hra             Decimal @db.Decimal(10, 2)
+  otherAllowances Decimal @db.Decimal(10, 2)
+  grossSalary     Decimal @db.Decimal(10, 2)
+
+  pfDeduction     Decimal @default(0) @db.Decimal(10, 2)
+  professionalTax Decimal @default(0) @db.Decimal(10, 2)
+  incomeTax       Decimal @default(0) @db.Decimal(10, 2)
+  totalDeductions Decimal @db.Decimal(10, 2)
+
+  netSalary   Decimal       @db.Decimal(10, 2)
+  status      PayslipStatus @default(GENERATED)
+  generatedAt DateTime      @default(now())
+  viewedAt    DateTime?
+
+  @@unique([employeeId, month, year])
+  @@map("payslips")
+}
