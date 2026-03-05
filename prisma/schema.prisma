@@ -101,9 +101,9 @@ model EmployeeProfile {
   managerId      String?
   manager        EmployeeProfile?  @relation("Reports", fields: [managerId], references: [id])
   reports        EmployeeProfile[] @relation("Reports")
- avatarUrl      String?
-bio            String?
-designation    String?
+  avatarUrl      String?
+  bio            String?
+  designation    String?
   leaveRequests        LeaveRequest[]
   leaveBalances        LeaveBalance[]
   assets               Asset[]
