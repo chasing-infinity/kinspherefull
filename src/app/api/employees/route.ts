@@ -11,6 +11,7 @@ const CreateSchema = z.object({
   role: z.enum(["SUPER_ADMIN","ADMIN","EMPLOYEE"]).default("EMPLOYEE"),
   departmentId: z.string().optional(),
   managerId: z.string().optional(),
+  designation: z.string().optional(),
   joiningDate: z.string(),
   employmentType: z.enum(["FULL_TIME","PART_TIME","CONTRACT","INTERN"]).default("FULL_TIME"),
   salary: z.number().optional(),
@@ -32,11 +33,24 @@ export async function GET(req: NextRequest) {
     { user: { email: { contains: search, mode: "insensitive" } } },
   ];
   const [employees, total] = await Promise.all([
-    db.employeeProfile.findMany({ where, include: { user: { select: { email:true, role:true } }, department:true, manager: { select: { id:true, firstName:true, lastName:true } } }, skip: (page-1)*limit, take: limit, orderBy: { firstName: "asc" } }),
+    db.employeeProfile.findMany({
+      where,
+      include: {
+        user: { select: { email:true, role:true } },
+        department: true,
+        manager: { select: { id:true, firstName:true, lastName:true } }
+      },
+      skip: (page-1)*limit,
+      take: limit,
+      orderBy: { firstName: "asc" }
+    }),
     db.employeeProfile.count({ where }),
   ]);
   const canSeeSalary = isAdminOrAbove(session.user.role);
-  return NextResponse.json({ employees: employees.map(e => ({ ...e, salary: canSeeSalary ? e.salary : undefined })), total });
+  return NextResponse.json({
+    employees: employees.map(e => ({ ...e, salary: canSeeSalary ? e.salary : undefined })),
+    total
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -50,9 +64,24 @@ export async function POST(req: NextRequest) {
   const employeeCode = `BF${String(count + 1).padStart(4, "0")}`;
   const hashedPw = await bcrypt.hash("Welcome@123", 10);
   const employee = await db.$transaction(async (tx) => {
-    const user = await tx.user.create({ data: { email: d.email, password: hashedPw, role: d.role } });
+    const user = await tx.user.create({
+      data: { email: d.email, password: hashedPw, role: d.role }
+    });
     const profile = await tx.employeeProfile.create({
-      data: { userId: user.id, employeeCode, firstName: d.firstName, lastName: d.lastName, phone: d.phone, dateOfBirth: d.dateOfBirth ? new Date(d.dateOfBirth) : undefined, joiningDate: new Date(d.joiningDate), employmentType: d.employmentType, salary: d.salary, departmentId: d.departmentId, managerId: d.managerId },
+      data: {
+        userId: user.id,
+        employeeCode,
+        firstName: d.firstName,
+        lastName: d.lastName,
+        phone: d.phone,
+        dateOfBirth: d.dateOfBirth ? new Date(d.dateOfBirth) : undefined,
+        joiningDate: new Date(d.joiningDate),
+        employmentType: d.employmentType,
+        salary: d.salary,
+        departmentId: d.departmentId || undefined,
+        managerId: d.managerId || undefined,
+        designation: d.designation || undefined,
+      },
     });
     const year = new Date().getFullYear();
     await tx.leaveBalance.createMany({ data: [
