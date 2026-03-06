@@ -80,7 +80,6 @@ export async function POST(req: NextRequest) {
         salary: d.salary,
         departmentId: d.departmentId || undefined,
         managerId: d.managerId || undefined,
-        ...(d.designation ? { designation: d.designation } : {}),
       } as any,
     });
     const year = new Date().getFullYear();
