@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
         salary: d.salary,
         departmentId: d.departmentId || undefined,
         managerId: d.managerId || undefined,
-        designation: d.designation || undefined,
-      },
+        ...(d.designation ? { designation: d.designation } : {}),
+      } as any,
     });
     const year = new Date().getFullYear();
     await tx.leaveBalance.createMany({ data: [
