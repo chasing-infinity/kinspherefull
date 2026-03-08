@@ -6,18 +6,18 @@ import { signOut } from "next-auth/react";
 const NAV = [
   { href:"/dashboard",    label:"Dashboard",    icon:"▦" },
   { href:"/employees",    label:"Employees",    icon:"◎" },
-  { href:"/leaves",       label:"Leave",         icon:"◷" },
-  { href:"/payroll",      label:"Payroll",       icon:"₹" },
-  { href:"/recognition",  label:"Recognition",   icon:"✦" },
-  { href:"/org-chart",    label:"Org Chart",     icon:"⬡" },
+  { href:"/leaves",       label:"Leave",        icon:"◷" },
+  { href:"/payroll",      label:"Payroll",      icon:"₹" },
+  { href:"/recognition",  label:"Recognition",  icon:"✦" },
+  { href:"/org-chart",    label:"Org Chart",    icon:"⬡" },
+  { href:"/settings",     label:"Settings",     icon:"⚙" },
 ];
 
 export function Sidebar({ user }: { user: { name?: string | null; email?: string | null; role: string } }) {
   const path = usePathname();
   const initials = user.name ? user.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() : "?";
   const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
-
-  const visibleNav = isAdmin ? NAV : NAV.filter(n => ["/dashboard","/leaves","/payroll","/recognition"].includes(n.href));
+  const visibleNav = isAdmin ? NAV : NAV.filter(n => ["/dashboard","/leaves","/payroll","/recognition","/settings"].includes(n.href));
 
   return (
     <div style={{ width:220, background:"#fff", borderRight:"1px solid #F3F4F6", display:"flex", flexDirection:"column", height:"100vh", position:"fixed", left:0, top:0, zIndex:10 }}>
@@ -31,7 +31,6 @@ export function Sidebar({ user }: { user: { name?: string | null; email?: string
           </div>
         </div>
       </div>
-
       {/* Nav */}
       <nav style={{ flex:1, padding:"12px 10px", overflowY:"auto" }}>
         {visibleNav.map(item => {
@@ -49,7 +48,6 @@ export function Sidebar({ user }: { user: { name?: string | null; email?: string
           );
         })}
       </nav>
-
       {/* User */}
       <div style={{ padding:"12px 14px", borderTop:"1px solid #F9FAFB" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
