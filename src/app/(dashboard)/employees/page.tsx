@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function EmployeesPage() {
   const { data: session } = useSession();
@@ -9,6 +10,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const isAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "SUPER_ADMIN";
+  const router = useRouter();
 
   useEffect(() => {
     const q = search ? `?search=${encodeURIComponent(search)}` : "";
@@ -45,7 +47,9 @@ export default function EmployeesPage() {
               {employees.map(emp => {
                 const rc = roleColors[emp.user?.role] || roleColors.EMPLOYEE;
                 return (
-                  <tr key={emp.id} style={{ borderTop:"1px solid #F9FAFB", cursor:"pointer" }}
+                  <tr key={emp.id}
+                    onClick={() => router.push(`/employees/${emp.id}`)}
+                    style={{ borderTop:"1px solid #F9FAFB", cursor:"pointer" }}
                     onMouseEnter={e => (e.currentTarget.style.background="#F9FAFB")}
                     onMouseLeave={e => (e.currentTarget.style.background="")}>
                     <td style={{ padding:"12px 16px" }}>
