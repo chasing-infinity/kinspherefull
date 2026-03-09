@@ -11,7 +11,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
   const emp = await db.employeeProfile.findFirst({
     where: { id: params.id, deletedAt: null },
-    include: { user: { select: { email:true, role:true } }, department:true, manager: { select: { id:true, firstName:true, lastName:true } }, reports: { select: { id:true, firstName:true, lastName:true } }, leaveBalances: true, assets:true, onboardingChecklist:true },
+    include: {
+      user: { select: { email: true, role: true } },
+      department: true,
+      manager: { select: { id: true, firstName: true, lastName: true } },
+      reports: { select: { id: true, firstName: true, lastName: true } },
+      leaveBalances: true,
+      assets: true,
+      onboardingChecklist: true,
+    },
   });
   if (!emp) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ...emp, salary: isAdminOrAbove(session.user.role) ? emp.salary : undefined });
@@ -29,7 +37,34 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const { session, error } = await requireSession();
   if (error || !session) return error!;
-  if (!isAdminOrAbove(session.user.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  await db.employeeProfile.update({ where: { id: params.id }, data: { deletedAt: new Date(), status: "OFFBOARDED" } });
+  if (session.user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Only Super Admins can offboard employees" }, { status: 403 });
+
+  const emp = await db.employeeProfile.findFirst({
+    where: { id: params.id, deletedAt: null },
+    include: { user: true },
+  });
+  if (!emp) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+
+  // Prevent offboarding yourself
+  if (emp.userId === session.user.id) return NextResponse.json({ error: "You cannot offboard yourself" }, { status: 400 });
+
+  await db.$transaction([
+    // Mark profile as offboarded
+    db.employeeProfile.update({
+      where: { id: params.id },
+      data: { status: "OFFBOARDED", deletedAt: new Date() },
+    }),
+    // Deactivate login by changing role to a blocked state
+    db.user.update({
+      where: { id: emp.userId },
+      data: { role: "EMPLOYEE", password: "DEACTIVATED" },
+    }),
+    // Cancel all pending leaves
+    db.leaveRequest.updateMany({
+      where: { employeeId: params.id, status: "PENDING" },
+      data: { status: "CANCELLED" },
+    }),
+  ]);
+
   return NextResponse.json({ success: true });
 }
