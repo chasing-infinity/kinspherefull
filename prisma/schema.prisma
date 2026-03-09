@@ -184,15 +184,17 @@ model OnboardingChecklist {
 }
 
 model Asset {
-  id          String          @id @default(cuid())
-  name        String
-  assetTag    String          @unique
-  description String?
-  employeeId  String?
-  employee    EmployeeProfile? @relation(fields: [employeeId], references: [id])
-  status      AssetStatus     @default(ASSIGNED)
-  assignedAt  DateTime?
-  returnedAt  DateTime?
+  id           String          @id @default(cuid())
+  name         String
+  deviceType   String
+  model        String?
+  serialNumber String?
+  assetTag     String          @unique
+  employeeId   String?
+  employee     EmployeeProfile? @relation(fields: [employeeId], references: [id])
+  status       AssetStatus     @default(ASSIGNED)
+  assignedAt   DateTime?
+  returnedAt   DateTime?
   @@map("assets")
 }
 
