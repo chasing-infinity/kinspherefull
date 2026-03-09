@@ -75,6 +75,56 @@ function AddAssetModal({ employeeId, onDone, onClose }: any) {
   );
 }
 
+function OffboardModal({ emp, onDone, onClose }: any) {
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState("");
+
+  const offboard = async () => {
+    setConfirming(true); setError("");
+    const res = await fetch(`/api/employees/${emp.id}`, { method: "DELETE" });
+    if (res.ok) { onDone(); onClose(); }
+    else { const d = await res.json(); setError(d.error || "Failed to offboard"); }
+    setConfirming(false);
+  };
+
+  const assignedAssets = emp.assets?.filter((a: any) => a.status === "ASSIGNED") || [];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 18, width: 480, boxShadow: "0 20px 50px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "22px 28px", borderBottom: "1px solid #F3F4F6" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Offboard Employee</div>
+          <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{emp.firstName} {emp.lastName}</div>
+        </div>
+        <div style={{ padding: "20px 28px" }}>
+          <div style={{ background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#92400E" }}>
+            This will deactivate their login and cancel all pending leave requests. Their records will be kept for history.
+          </div>
+          {assignedAssets.length > 0 && (
+            <div style={{ background: "#FEE2E2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#B91C1C" }}>
+              Warning: {assignedAssets.length} device(s) still assigned. Please mark them as returned before offboarding.
+              <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                {assignedAssets.map((a: any) => <li key={a.id}>{a.name} ({a.assetTag})</li>)}
+              </ul>
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: "#374151" }}>
+            Offboarding date: <strong>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong>
+          </div>
+          {error && <div style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginTop: 12 }}>{error}</div>}
+        </div>
+        <div style={{ padding: "0 28px 20px", display: "flex", gap: 10 }}>
+          <button disabled={confirming} onClick={offboard}
+            style={{ flex: 1, background: confirming ? "#9CA3AF" : "#EF4444", color: "#fff", border: "none", borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 600, cursor: confirming ? "not-allowed" : "pointer" }}>
+            {confirming ? "Offboarding…" : "Confirm Offboard"}
+          </button>
+          <button onClick={onClose} style={{ padding: "10px 16px", background: "#F3F4F6", color: "#374151", border: "none", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EmployeeProfilePage() {
   const { data: session } = useSession();
   const { id } = useParams();
@@ -83,6 +133,7 @@ export default function EmployeeProfilePage() {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAssetModal, setShowAssetModal] = useState(false);
+  const [showOffboardModal, setShowOffboardModal] = useState(false);
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   const isAdmin = session?.user?.role === "ADMIN" || isSuperAdmin;
 
@@ -132,10 +183,24 @@ export default function EmployeeProfilePage() {
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <button onClick={() => router.push("/employees")}
-        style={{ background: "none", border: "none", color: "#9CA3AF", fontSize: 13, cursor: "pointer", marginBottom: 20, padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
-        ← Back to Employees
-      </button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <button onClick={() => router.push("/employees")}
+          style={{ background: "none", border: "none", color: "#9CA3AF", fontSize: 13, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+          ← Back to Employees
+        </button>
+        {isSuperAdmin && emp.status === "ACTIVE" && (
+          <button onClick={() => setShowOffboardModal(true)}
+            style={{ background: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            Offboard Employee
+          </button>
+        )}
+      </div>
+
+      {emp.status === "OFFBOARDED" && (
+        <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#B91C1C", fontWeight: 600 }}>
+          This employee has been offboarded.
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background: "#fff", border: "1px solid #F3F4F6", borderRadius: 14, padding: 24, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)", display: "flex", alignItems: "center", gap: 20 }}>
@@ -184,7 +249,7 @@ export default function EmployeeProfilePage() {
       <div style={{ background: "#fff", border: "1px solid #F3F4F6", borderRadius: 14, padding: 24, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Assigned Devices</div>
-          {isSuperAdmin && (
+          {isSuperAdmin && emp.status === "ACTIVE" && (
             <button onClick={() => setShowAssetModal(true)}
               style={{ background: "#4F6EF7", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               + Assign Device
@@ -231,11 +296,10 @@ export default function EmployeeProfilePage() {
       </div>
 
       {showAssetModal && (
-        <AddAssetModal
-          employeeId={id}
-          onDone={loadAssets}
-          onClose={() => setShowAssetModal(false)}
-        />
+        <AddAssetModal employeeId={id} onDone={loadAssets} onClose={() => setShowAssetModal(false)} />
+      )}
+      {showOffboardModal && (
+        <OffboardModal emp={{ ...emp, assets }} onDone={() => router.push("/employees")} onClose={() => setShowOffboardModal(false)} />
       )}
     </div>
   );
