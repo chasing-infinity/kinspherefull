@@ -107,6 +107,7 @@ model EmployeeProfile {
   leaveRequests        LeaveRequest[]
   leaveBalances        LeaveBalance[]
   assets               Asset[]
+  documents            Document[]
   onboardingChecklist  OnboardingChecklist?
   receivedRecognitions Recognition[] @relation("ReceivedBy")
   payrollConfig        PayrollConfig?
@@ -198,18 +199,30 @@ model Asset {
   @@map("assets")
 }
 
+model Document {
+  id           String          @id @default(cuid())
+  employeeId   String
+  employee     EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name         String
+  documentType String
+  fileUrl      String
+  filePath     String
+  fileSize     Int?
+  uploadedBy   String
+  createdAt    DateTime        @default(now())
+  @@map("documents")
+}
+
 // ─── PAYROLL ──────────────────────────────────────
 
-/// Admin configures this once per employee. Drives all future payslip generation.
 model PayrollConfig {
   id         String          @id @default(cuid())
   employeeId String          @unique
   employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  annualCTC      Decimal @db.Decimal(12, 2)   // e.g. 1200000
-  basicPercent   Decimal @db.Decimal(5, 2)    // e.g. 40.00  → 40% of CTC/12 = Basic
-  hraPercent     Decimal @db.Decimal(5, 2)    // e.g. 20.00  → 20% of CTC/12 = HRA
-  // Other Allowances = (100 - basic - hra)% of monthly CTC
+  annualCTC      Decimal @db.Decimal(12, 2)
+  basicPercent   Decimal @db.Decimal(5, 2)
+  hraPercent     Decimal @db.Decimal(5, 2)
 
   pfDeduction     Decimal @default(0) @db.Decimal(10, 2)
   professionalTax Decimal @default(0) @db.Decimal(10, 2)
@@ -223,13 +236,12 @@ model PayrollConfig {
   @@map("payroll_configs")
 }
 
-/// One record per employee per month. Generated on the 15th automatically.
 model Payslip {
   id         String          @id @default(cuid())
   employeeId String
   employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  month Int   // 1–12
+  month Int
   year  Int
 
   basicSalary     Decimal @db.Decimal(10, 2)
