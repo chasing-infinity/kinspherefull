@@ -147,6 +147,10 @@ function EditModal({ emp, onDone, onClose }: any) {
               <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Frontend Engineer" style={iStyle} />
             </div>
             <div>
+  <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Date of Joining</label>
+  <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} style={iStyle} />
+</div>
+            <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Employment Type</label>
               <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} style={iStyle}>
                 <option value="FULL_TIME">Full Time</option>
