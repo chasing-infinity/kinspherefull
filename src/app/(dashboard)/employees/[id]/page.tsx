@@ -81,6 +81,7 @@ function EditModal({ emp, onDone, onClose }: any) {
   const [phone, setPhone] = useState(emp.phone || "");
   const [dateOfBirth, setDateOfBirth] = useState(emp.dateOfBirth ? emp.dateOfBirth.split("T")[0] : "");
   const [designation, setDesignation] = useState(emp.designation || "");
+  const [joiningDate, setJoiningDate] = useState(emp.joiningDate ? emp.joiningDate.split("T")[0] : "");
   const [employmentType, setEmploymentType] = useState(emp.employmentType || "FULL_TIME");
   const [role, setRole] = useState(emp.user?.role || "EMPLOYEE");
   const [salary, setSalary] = useState(emp.salary ? String(emp.salary) : "");
