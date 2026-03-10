@@ -102,7 +102,7 @@ function EditModal({ emp, onDone, onClose }: any) {
     const res = await fetch(`/api/employees/${emp.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstName, lastName, phone, dateOfBirth, designation, employmentType, role, salary: salary ? Number(salary) : undefined, departmentId: departmentId || null, managerId: managerId || null }),
+      body: JSON.stringify({ firstName, lastName, phone, dateOfBirth, designation, joiningDate, employmentType, role, salary: salary ? Number(salary) : undefined, departmentId: departmentId || null, managerId: managerId || null }),
     });
     if (res.ok) { onDone(); onClose(); }
     else { const d = await res.json(); setError(d.error || "Failed to save"); }
