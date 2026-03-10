@@ -28,10 +28,44 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { session, error } = await requireSession();
   if (error || !session) return error!;
-  if (!isAdminOrAbove(session.user.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const body = await req.json();
-  const emp = await db.employeeProfile.update({ where: { id: params.id }, data: body });
-  return NextResponse.json(emp);
+  if (session.user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Only Super Admins can edit employees" }, { status: 403 });
+
+  const { role, firstName, lastName, phone, dateOfBirth, designation, departmentId, managerId, employmentType, salary } = await req.json();
+
+  const emp = await db.employeeProfile.findFirst({ where: { id: params.id, deletedAt: null }, include: { user: true } });
+  if (!emp) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+
+  await db.$transaction([
+    db.employeeProfile.update({
+      where: { id: params.id },
+      data: {
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        phone: phone || undefined,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        designation: designation || undefined,
+        departmentId: departmentId || undefined,
+        managerId: managerId || null,
+        employmentType: employmentType || undefined,
+        salary: salary ? Number(salary) : undefined,
+      },
+    }),
+    db.user.update({
+      where: { id: emp.userId },
+      data: { role: role || undefined },
+    }),
+  ]);
+
+  const updated = await db.employeeProfile.findFirst({
+    where: { id: params.id },
+    include: {
+      user: { select: { email: true, role: true } },
+      department: true,
+      manager: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
@@ -44,22 +78,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     include: { user: true },
   });
   if (!emp) return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-
-  // Prevent offboarding yourself
   if (emp.userId === session.user.id) return NextResponse.json({ error: "You cannot offboard yourself" }, { status: 400 });
 
   await db.$transaction([
-    // Mark profile as offboarded
     db.employeeProfile.update({
       where: { id: params.id },
       data: { status: "OFFBOARDED", deletedAt: new Date() },
     }),
-    // Deactivate login by changing role to a blocked state
     db.user.update({
       where: { id: emp.userId },
       data: { role: "EMPLOYEE", password: "DEACTIVATED" },
     }),
-    // Cancel all pending leaves
     db.leaveRequest.updateMany({
       where: { employeeId: params.id, status: "PENDING" },
       data: { status: "CANCELLED" },
