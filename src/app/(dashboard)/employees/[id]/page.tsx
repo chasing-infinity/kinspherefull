@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -75,6 +75,78 @@ function AddAssetModal({ employeeId, onDone, onClose }: any) {
   );
 }
 
+function UploadDocumentModal({ employeeId, onDone, onClose }: any) {
+  const [name, setName] = useState("");
+  const [documentType, setDocumentType] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const save = async () => {
+    if (!name || !documentType || !file) { setError("All fields are required"); return; }
+    setSaving(true); setError("");
+    const formData = new FormData();
+    formData.append("employeeId", employeeId);
+    formData.append("name", name);
+    formData.append("documentType", documentType);
+    formData.append("file", file);
+    const res = await fetch("/api/documents", { method: "POST", body: formData });
+    if (res.ok) { onDone(); onClose(); }
+    else { const d = await res.json(); setError(d.error || "Failed to upload"); }
+    setSaving(false);
+  };
+
+  const iStyle: any = { width: "100%", padding: "9px 12px", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 18, width: 480, boxShadow: "0 20px 50px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "22px 28px", borderBottom: "1px solid #F3F4F6" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Upload Document</div>
+        </div>
+        <div style={{ padding: "20px 28px" }}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Document Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Offer Letter 2024" style={iStyle} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Document Type</label>
+            <select value={documentType} onChange={e => setDocumentType(e.target.value)} style={iStyle}>
+              <option value="">Select type…</option>
+              <option value="Offer Letter">Offer Letter</option>
+              <option value="Employment Contract">Employment Contract</option>
+              <option value="ID Proof">ID Proof</option>
+              <option value="Appraisal Letter">Appraisal Letter</option>
+              <option value="Relieving Letter">Relieving Letter</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>File</label>
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{ border: "2px dashed #E5E7EB", borderRadius: 8, padding: "20px", textAlign: "center", cursor: "pointer", background: file ? "#F0FDF4" : "#F9FAFB" }}>
+              <div style={{ fontSize: 13, color: file ? "#166534" : "#9CA3AF" }}>
+                {file ? `✓ ${file.name}` : "Click to select a file (PDF, JPG, PNG)"}
+              </div>
+              {file && <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>{(file.size / 1024).toFixed(1)} KB</div>}
+            </div>
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style={{ display: "none" }} onChange={e => setFile(e.target.files?.[0] || null)} />
+          </div>
+          {error && <div style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        </div>
+        <div style={{ padding: "0 28px 20px", display: "flex", gap: 10 }}>
+          <button disabled={saving} onClick={save} style={{ flex: 1, background: saving ? "#9CA3AF" : "#4F6EF7", color: "#fff", border: "none", borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Uploading…" : "Upload Document"}
+          </button>
+          <button onClick={onClose} style={{ padding: "10px 16px", background: "#F3F4F6", color: "#374151", border: "none", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditModal({ emp, onDone, onClose }: any) {
   const [firstName, setFirstName] = useState(emp.firstName || "");
   const [lastName, setLastName] = useState(emp.lastName || "");
@@ -85,7 +157,7 @@ function EditModal({ emp, onDone, onClose }: any) {
   const [employmentType, setEmploymentType] = useState(emp.employmentType || "FULL_TIME");
   const [role, setRole] = useState(emp.user?.role || "EMPLOYEE");
   const [salary, setSalary] = useState(emp.salary ? String(emp.salary) : "");
-  const [departmentId, setDepartmentId] = useState(emp.departmentId || "");
+  const [departmentId, setDepartmentId] = useState(emp.departmentId || emp.department?.id || "");
   const [managerId, setManagerId] = useState(emp.managerId || "");
   const [departments, setDepartments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -93,7 +165,7 @@ function EditModal({ emp, onDone, onClose }: any) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-   fetch("/api/departments").then(r => r.json()).then(d => setDepartments(Array.isArray(d) ? d : (d.departments || [])));
+    fetch("/api/departments").then(r => r.json()).then(d => setDepartments(Array.isArray(d) ? d : (d.departments || [])));
     fetch("/api/employees").then(r => r.json()).then(d => setEmployees((d.employees || []).filter((e: any) => e.id !== emp.id)));
   }, []);
 
@@ -119,7 +191,6 @@ function EditModal({ emp, onDone, onClose }: any) {
           <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{emp.firstName} {emp.lastName} · {emp.employeeCode}</div>
         </div>
         <div style={{ padding: "20px 28px" }}>
-
           <div style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Personal Details</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
@@ -147,9 +218,9 @@ function EditModal({ emp, onDone, onClose }: any) {
               <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Frontend Engineer" style={iStyle} />
             </div>
             <div>
-  <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Date of Joining</label>
-  <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} style={iStyle} />
-</div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Date of Joining</label>
+              <input type="date" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} style={iStyle} />
+            </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Employment Type</label>
               <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} style={iStyle}>
@@ -186,7 +257,6 @@ function EditModal({ emp, onDone, onClose }: any) {
               <input type="number" value={salary} onChange={e => setSalary(e.target.value)} placeholder="e.g. 1200000" style={iStyle} />
             </div>
           </div>
-
           {error && <div style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         </div>
         <div style={{ padding: "0 28px 20px", display: "flex", gap: 10 }}>
@@ -256,10 +326,13 @@ export default function EmployeeProfilePage() {
   const router = useRouter();
   const [emp, setEmp] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [showOffboardModal, setShowOffboardModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   const isAdmin = session?.user?.role === "ADMIN" || isSuperAdmin;
 
@@ -278,10 +351,18 @@ export default function EmployeeProfilePage() {
       .catch(console.error);
   };
 
+  const loadDocuments = () => {
+    fetch(`/api/documents?employeeId=${id}`)
+      .then(r => r.json())
+      .then(d => setDocuments(Array.isArray(d) ? d : []))
+      .catch(console.error);
+  };
+
   useEffect(() => {
     if (!id) return;
     loadEmp();
     loadAssets();
+    loadDocuments();
   }, [id]);
 
   const markReturned = async (assetId: string) => {
@@ -291,6 +372,26 @@ export default function EmployeeProfilePage() {
       body: JSON.stringify({ id: assetId, status: "RETURNED" }),
     });
     loadAssets();
+  };
+
+  const deleteDocument = async (doc: any) => {
+    setDeletingDocId(doc.id);
+    await fetch("/api/documents", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: doc.id, filePath: doc.filePath }),
+    });
+    loadDocuments();
+    setDeletingDocId(null);
+  };
+
+  const docTypeColors: Record<string, { bg: string; color: string }> = {
+    "Offer Letter": { bg: "#EEF1FE", color: "#4F6EF7" },
+    "Employment Contract": { bg: "#FFF7ED", color: "#C2410C" },
+    "ID Proof": { bg: "#F0FDF4", color: "#166534" },
+    "Appraisal Letter": { bg: "#FDF4FF", color: "#7E22CE" },
+    "Relieving Letter": { bg: "#FEF2F2", color: "#B91C1C" },
+    "Other": { bg: "#F3F4F6", color: "#6B7280" },
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#9CA3AF" }}>Loading…</div>;
@@ -381,6 +482,51 @@ export default function EmployeeProfilePage() {
         </div>
       </div>
 
+      {/* Documents */}
+      <div style={{ background: "#fff", border: "1px solid #F3F4F6", borderRadius: 14, padding: 24, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Documents</div>
+          {isAdmin && (
+            <button onClick={() => setShowDocModal(true)}
+              style={{ background: "#4F6EF7", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              + Upload Document
+            </button>
+          )}
+        </div>
+        {documents.length === 0 ? (
+          <div style={{ color: "#9CA3AF", fontSize: 13 }}>No documents uploaded yet.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {documents.map(doc => {
+              const tc = docTypeColors[doc.documentType] || docTypeColors["Other"];
+              return (
+                <div key={doc.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#F9FAFB", borderRadius: 10 }}>
+                  <div style={{ fontSize: 22 }}>📄</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
+                    <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
+                      {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB · ` : ""}
+                      {new Date(doc.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                  </div>
+                  <span style={{ background: tc.bg, color: tc.color, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>{doc.documentType}</span>
+                  <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ background: "#EEF1FE", color: "#4F6EF7", border: "none", borderRadius: 7, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "none" }}>
+                    View
+                  </a>
+                  {isAdmin && (
+                    <button onClick={() => deleteDocument(doc)} disabled={deletingDocId === doc.id}
+                      style={{ background: "#FEF2F2", color: "#EF4444", border: "none", borderRadius: 7, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      {deletingDocId === doc.id ? "…" : "Delete"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Assets */}
       <div style={{ background: "#fff", border: "1px solid #F3F4F6", borderRadius: 14, padding: 24, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
@@ -432,6 +578,7 @@ export default function EmployeeProfilePage() {
       </div>
 
       {showAssetModal && <AddAssetModal employeeId={id} onDone={loadAssets} onClose={() => setShowAssetModal(false)} />}
+      {showDocModal && <UploadDocumentModal employeeId={id} onDone={loadDocuments} onClose={() => setShowDocModal(false)} />}
       {showEditModal && <EditModal emp={emp} onDone={() => { loadEmp(); setShowEditModal(false); }} onClose={() => setShowEditModal(false)} />}
       {showOffboardModal && <OffboardModal emp={{ ...emp, assets }} onDone={() => router.push("/employees")} onClose={() => setShowOffboardModal(false)} />}
     </div>
