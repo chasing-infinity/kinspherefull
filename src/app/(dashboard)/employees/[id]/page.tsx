@@ -75,6 +75,126 @@ function AddAssetModal({ employeeId, onDone, onClose }: any) {
   );
 }
 
+function EditModal({ emp, onDone, onClose }: any) {
+  const [firstName, setFirstName] = useState(emp.firstName || "");
+  const [lastName, setLastName] = useState(emp.lastName || "");
+  const [phone, setPhone] = useState(emp.phone || "");
+  const [dateOfBirth, setDateOfBirth] = useState(emp.dateOfBirth ? emp.dateOfBirth.split("T")[0] : "");
+  const [designation, setDesignation] = useState(emp.designation || "");
+  const [employmentType, setEmploymentType] = useState(emp.employmentType || "FULL_TIME");
+  const [role, setRole] = useState(emp.user?.role || "EMPLOYEE");
+  const [salary, setSalary] = useState(emp.salary ? String(emp.salary) : "");
+  const [departmentId, setDepartmentId] = useState(emp.departmentId || "");
+  const [managerId, setManagerId] = useState(emp.managerId || "");
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/departments").then(r => r.json()).then(d => setDepartments(Array.isArray(d) ? d : []));
+    fetch("/api/employees").then(r => r.json()).then(d => setEmployees((d.employees || []).filter((e: any) => e.id !== emp.id)));
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setError("");
+    const res = await fetch(`/api/employees/${emp.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, lastName, phone, dateOfBirth, designation, employmentType, role, salary: salary ? Number(salary) : undefined, departmentId: departmentId || null, managerId: managerId || null }),
+    });
+    if (res.ok) { onDone(); onClose(); }
+    else { const d = await res.json(); setError(d.error || "Failed to save"); }
+    setSaving(false);
+  };
+
+  const iStyle: any = { width: "100%", padding: "9px 12px", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 18, width: 560, maxHeight: "90vh", overflow: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "22px 28px", borderBottom: "1px solid #F3F4F6" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Edit Employee</div>
+          <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>{emp.firstName} {emp.lastName} · {emp.employeeCode}</div>
+        </div>
+        <div style={{ padding: "20px 28px" }}>
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Personal Details</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>First Name</label>
+              <input value={firstName} onChange={e => setFirstName(e.target.value)} style={iStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Last Name</label>
+              <input value={lastName} onChange={e => setLastName(e.target.value)} style={iStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Phone</label>
+              <input value={phone} onChange={e => setPhone(e.target.value)} style={iStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Date of Birth</label>
+              <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={iStyle} />
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Employment Details</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Designation</label>
+              <input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Frontend Engineer" style={iStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Employment Type</label>
+              <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} style={iStyle}>
+                <option value="FULL_TIME">Full Time</option>
+                <option value="PART_TIME">Part Time</option>
+                <option value="CONTRACT">Contract</option>
+                <option value="INTERN">Intern</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Department</label>
+              <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} style={iStyle}>
+                <option value="">No department</option>
+                {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Manager</label>
+              <select value={managerId} onChange={e => setManagerId(e.target.value)} style={iStyle}>
+                <option value="">No manager</option>
+                {employees.map((e: any) => <option key={e.id} value={e.id}>{e.firstName} {e.lastName}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Role</label>
+              <select value={role} onChange={e => setRole(e.target.value)} style={iStyle}>
+                <option value="EMPLOYEE">Employee</option>
+                <option value="ADMIN">Admin</option>
+                <option value="SUPER_ADMIN">Super Admin</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 5 }}>Annual Salary (₹)</label>
+              <input type="number" value={salary} onChange={e => setSalary(e.target.value)} placeholder="e.g. 1200000" style={iStyle} />
+            </div>
+          </div>
+
+          {error && <div style={{ background: "#FEE2E2", color: "#B91C1C", borderRadius: 8, padding: "9px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        </div>
+        <div style={{ padding: "0 28px 20px", display: "flex", gap: 10 }}>
+          <button disabled={saving} onClick={save} style={{ flex: 1, background: saving ? "#9CA3AF" : "#4F6EF7", color: "#fff", border: "none", borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+          <button onClick={onClose} style={{ padding: "10px 16px", background: "#F3F4F6", color: "#374151", border: "none", borderRadius: 10, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OffboardModal({ emp, onDone, onClose }: any) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
@@ -134,8 +254,17 @@ export default function EmployeeProfilePage() {
   const [loading, setLoading] = useState(true);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [showOffboardModal, setShowOffboardModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   const isAdmin = session?.user?.role === "ADMIN" || isSuperAdmin;
+
+  const loadEmp = () => {
+    fetch(`/api/employees/${id}`)
+      .then(r => r.json())
+      .then(setEmp)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
 
   const loadAssets = () => {
     fetch(`/api/assets?employeeId=${id}`)
@@ -146,11 +275,7 @@ export default function EmployeeProfilePage() {
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/employees/${id}`)
-      .then(r => r.json())
-      .then(setEmp)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadEmp();
     loadAssets();
   }, [id]);
 
@@ -189,10 +314,16 @@ export default function EmployeeProfilePage() {
           ← Back to Employees
         </button>
         {isSuperAdmin && emp.status === "ACTIVE" && (
-          <button onClick={() => setShowOffboardModal(true)}
-            style={{ background: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            Offboard Employee
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShowEditModal(true)}
+              style={{ background: "#EEF1FE", color: "#4F6EF7", border: "1px solid #C7D2FE", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Edit Employee
+            </button>
+            <button onClick={() => setShowOffboardModal(true)}
+              style={{ background: "#FEF2F2", color: "#EF4444", border: "1px solid #FECACA", borderRadius: 8, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Offboard Employee
+            </button>
+          </div>
         )}
       </div>
 
@@ -295,12 +426,9 @@ export default function EmployeeProfilePage() {
         )}
       </div>
 
-      {showAssetModal && (
-        <AddAssetModal employeeId={id} onDone={loadAssets} onClose={() => setShowAssetModal(false)} />
-      )}
-      {showOffboardModal && (
-        <OffboardModal emp={{ ...emp, assets }} onDone={() => router.push("/employees")} onClose={() => setShowOffboardModal(false)} />
-      )}
+      {showAssetModal && <AddAssetModal employeeId={id} onDone={loadAssets} onClose={() => setShowAssetModal(false)} />}
+      {showEditModal && <EditModal emp={emp} onDone={() => { loadEmp(); setShowEditModal(false); }} onClose={() => setShowEditModal(false)} />}
+      {showOffboardModal && <OffboardModal emp={{ ...emp, assets }} onDone={() => router.push("/employees")} onClose={() => setShowOffboardModal(false)} />}
     </div>
   );
 }
