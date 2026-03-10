@@ -92,7 +92,7 @@ function EditModal({ emp, onDone, onClose }: any) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/departments").then(r => r.json()).then(d => setDepartments(Array.isArray(d) ? d : []));
+   fetch("/api/departments").then(r => r.json()).then(d => setDepartments(Array.isArray(d) ? d : (d.departments || [])));
     fetch("/api/employees").then(r => r.json()).then(d => setEmployees((d.employees || []).filter((e: any) => e.id !== emp.id)));
   }, []);
 
