@@ -131,21 +131,22 @@ model LeaveBalance {
 }
 
 model LeaveRequest {
-  id           String          @id @default(cuid())
-  employeeId   String
-  employee     EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  leaveType    LeaveType
-  startDate    DateTime
-  endDate      DateTime
-  days         Int
-  reason       String
-  status       LeaveStatus     @default(PENDING)
-  note         String?
-  approvedById String?
-  approvedBy   User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  employeeId      String
+  employee        EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType       LeaveType
+  startDate       DateTime
+  endDate         DateTime
+  days            Int
+  reason          String
+  status          LeaveStatus     @default(PENDING)
+  note            String?
+  taggedApprovers String[]        @default([])
+  approvedById    String?
+  approvedBy      User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   @@map("leave_requests")
 }
 
