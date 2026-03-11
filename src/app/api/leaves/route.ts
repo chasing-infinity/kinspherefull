@@ -4,22 +4,19 @@ import { requireSession, isAdminOrAbove } from "@/lib/auth/permissions";
 import { z } from "zod";
 
 const Schema = z.object({
-  leaveType: z.enum(["SICK","CASUAL","PAID","UNPAID"]),
+  leaveType: z.enum(["SICK", "CASUAL", "PAID", "UNPAID"]),
   startDate: z.string(),
   endDate: z.string(),
   reason: z.string().min(5),
+  taggedApprovers: z.array(z.string()).optional(),
 });
 
-// 16 leaves per year: 8 sick + 8 earned
-// Credited 4 per quarter: 2 sick + 2 earned
-// Quarters: Q1=Jan, Q2=Apr, Q3=Jul, Q4=Oct
 function getQuarterlyAccrual(leaveType: string): number {
   const now = new Date();
-  const month = now.getMonth(); // 0-11
-  const quartersPassed = Math.floor(month / 3) + 1; // 1-4
-
-  if (leaveType === "SICK") return quartersPassed * 2;   // 2 per quarter = 8/year
-  if (leaveType === "PAID") return quartersPassed * 2;   // 2 per quarter = 8/year (earned)
+  const month = now.getMonth();
+  const quartersPassed = Math.floor(month / 3) + 1;
+  if (leaveType === "SICK") return quartersPassed * 2;
+  if (leaveType === "PAID") return quartersPassed * 2;
   return 0;
 }
 
@@ -58,17 +55,16 @@ export async function POST(req: NextRequest) {
   const parsed = Schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { leaveType, startDate, endDate, reason } = parsed.data;
+  const { leaveType, startDate, endDate, reason, taggedApprovers } = parsed.data;
   const start = new Date(startDate);
   const end = new Date(endDate);
   const days = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
   const year = new Date().getFullYear();
 
-  // Check for overlapping requests
   const overlap = await db.leaveRequest.findFirst({
     where: {
       employeeId: profile.id,
-      status: { in: ["APPROVED","PENDING"] },
+      status: { in: ["APPROVED", "PENDING"] },
       OR: [{ startDate: { lte: end }, endDate: { gte: start } }],
     },
   });
@@ -76,12 +72,9 @@ export async function POST(req: NextRequest) {
 
   if (leaveType === "SICK" || leaveType === "PAID") {
     const accrued = getQuarterlyAccrual(leaveType);
-
-    // Get or create balance with correct accrued amount
     let bal = await db.leaveBalance.findUnique({
       where: { employeeId_leaveType_year: { employeeId: profile.id, leaveType, year } },
     });
-
     if (!bal) {
       bal = await db.leaveBalance.create({
         data: { employeeId: profile.id, leaveType, year, total: accrued },
@@ -92,10 +85,8 @@ export async function POST(req: NextRequest) {
         data: { total: accrued },
       });
     }
-
     const avail = (bal?.total ?? 0) - (bal?.used ?? 0) - (bal?.pending ?? 0);
     if (days > avail) return NextResponse.json({ error: `Only ${avail} days available` }, { status: 400 });
-
     await db.leaveBalance.update({
       where: { employeeId_leaveType_year: { employeeId: profile.id, leaveType, year } },
       data: { pending: { increment: days } },
@@ -103,7 +94,15 @@ export async function POST(req: NextRequest) {
   }
 
   const leave = await db.leaveRequest.create({
-    data: { employeeId: profile.id, leaveType, startDate: start, endDate: end, days, reason },
+    data: {
+      employeeId: profile.id,
+      leaveType,
+      startDate: start,
+      endDate: end,
+      days,
+      reason,
+      taggedApprovers: taggedApprovers ?? [],
+    },
   });
 
   return NextResponse.json(leave, { status: 201 });
