@@ -7,8 +7,11 @@ export async function GET(req: NextRequest) {
   if (error || !session) return error!;
 
   const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+  const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+  const todayIST = new Date(today.getTime() + IST_OFFSET);
+  const todayDateStr = todayIST.toISOString().split("T")[0];
+  const todayStart = new Date(todayDateStr + "T00:00:00+05:30");
+  const todayEnd = new Date(todayDateStr + "T23:59:59+05:30");
 
   if (isAdminOrAbove(session.user.role)) {
     const [onLeaveToday, pendingApprovals, totalEmployees, recentLeaves, onLeaveNow] = await Promise.all([
@@ -24,11 +27,7 @@ export async function GET(req: NextRequest) {
         take: 5,
       }),
       db.leaveRequest.findMany({
-        where: {
-          status: "APPROVED",
-          startDate: { lte: todayEnd },
-          endDate: { gte: todayStart },
-        },
+        where: { status: "APPROVED", startDate: { lte: todayEnd }, endDate: { gte: todayStart } },
         include: { employee: { select: { firstName: true, lastName: true } } },
         orderBy: { startDate: "asc" },
       }),
@@ -72,11 +71,7 @@ export async function GET(req: NextRequest) {
     db.leaveRequest.findMany({ where: { employeeId: profile.id }, orderBy: { createdAt: "desc" }, take: 5 }),
     db.holiday.findMany({ where: { date: { gte: today } }, orderBy: { date: "asc" }, take: 5 }),
     db.leaveRequest.findMany({
-      where: {
-        status: "APPROVED",
-        startDate: { lte: todayEnd },
-        endDate: { gte: todayStart },
-      },
+      where: { status: "APPROVED", startDate: { lte: todayEnd }, endDate: { gte: todayStart } },
       include: { employee: { select: { firstName: true, lastName: true } } },
       orderBy: { startDate: "asc" },
     }),
