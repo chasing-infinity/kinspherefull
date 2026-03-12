@@ -13,6 +13,26 @@ export async function GET(req: NextRequest) {
   const todayStart = new Date(todayDateStr + "T00:00:00+05:30");
   const todayEnd = new Date(todayDateStr + "T23:59:59+05:30");
 
+  const next30 = new Date(today); next30.setDate(today.getDate() + 30);
+
+  const allEmployees = await db.employeeProfile.findMany({
+    where: { status: "ACTIVE", deletedAt: null },
+    select: { id: true, firstName: true, lastName: true, dateOfBirth: true, joiningDate: true },
+  });
+
+  const birthdays = allEmployees.filter(e => {
+    if (!e.dateOfBirth) return false;
+    const d = new Date(today.getFullYear(), e.dateOfBirth.getMonth(), e.dateOfBirth.getDate());
+    if (d < today) d.setFullYear(today.getFullYear() + 1);
+    return d <= next30;
+  }).slice(0, 5);
+
+  const anniversaries = allEmployees.filter(e => {
+    const d = new Date(today.getFullYear(), e.joiningDate.getMonth(), e.joiningDate.getDate());
+    if (d < today) d.setFullYear(today.getFullYear() + 1);
+    return d <= next30;
+  }).slice(0, 5);
+
   if (isAdminOrAbove(session.user.role)) {
     const [onLeaveToday, pendingApprovals, totalEmployees, recentLeaves, onLeaveNow] = await Promise.all([
       db.leaveRequest.count({
@@ -32,25 +52,6 @@ export async function GET(req: NextRequest) {
         orderBy: { startDate: "asc" },
       }),
     ]);
-
-    const employees = await db.employeeProfile.findMany({
-      where: { status: "ACTIVE", deletedAt: null },
-      select: { id: true, firstName: true, lastName: true, dateOfBirth: true, joiningDate: true },
-    });
-
-    const next30 = new Date(today); next30.setDate(today.getDate() + 30);
-    const birthdays = employees.filter(e => {
-      if (!e.dateOfBirth) return false;
-      const d = new Date(today.getFullYear(), e.dateOfBirth.getMonth(), e.dateOfBirth.getDate());
-      if (d < today) d.setFullYear(today.getFullYear() + 1);
-      return d <= next30;
-    }).slice(0, 5);
-
-    const anniversaries = employees.filter(e => {
-      const d = new Date(today.getFullYear(), e.joiningDate.getMonth(), e.joiningDate.getDate());
-      if (d < today) d.setFullYear(today.getFullYear() + 1);
-      return d <= next30;
-    }).slice(0, 5);
 
     return NextResponse.json({
       type: "admin",
@@ -77,5 +78,5 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  return NextResponse.json({ type: "employee", leaveBalances, myRequests, upcomingHolidays, onLeaveNow });
+  return NextResponse.json({ type: "employee", leaveBalances, myRequests, upcomingHolidays, onLeaveNow, birthdays, anniversaries });
 }
