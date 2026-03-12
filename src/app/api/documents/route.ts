@@ -12,9 +12,18 @@ const supabase = createClient(
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error || !session) return error!;
+
   const { searchParams } = new URL(req.url);
   const employeeId = searchParams.get("employeeId");
   if (!employeeId) return NextResponse.json({ error: "employeeId required" }, { status: 400 });
+
+  // Super Admin can view anyone's docs; others can only view their own
+  if (session.user.role !== "SUPER_ADMIN") {
+    const profile = await db.employeeProfile.findUnique({ where: { userId: session.user.id } });
+    if (!profile || profile.id !== employeeId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+  }
 
   const docs = await db.document.findMany({
     where: { employeeId },
@@ -26,7 +35,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error || !session) return error!;
-  if (!isAdminOrAbove(session.user.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (session.user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File;
@@ -43,7 +52,6 @@ export async function POST(req: NextRequest) {
   const { error: uploadError } = await supabase.storage
     .from("employee-documents")
     .upload(filePath, file, { contentType: file.type });
-
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
   const { data: { publicUrl } } = supabase.storage
@@ -61,20 +69,18 @@ export async function POST(req: NextRequest) {
       uploadedBy: session.user.id,
     },
   });
-
   return NextResponse.json(doc, { status: 201 });
 }
 
 export async function DELETE(req: NextRequest) {
   const { session, error } = await requireSession();
   if (error || !session) return error!;
-  if (!isAdminOrAbove(session.user.role)) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (session.user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const { id, filePath } = await req.json();
   if (!id || !filePath) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   await supabase.storage.from("employee-documents").remove([filePath]);
   await db.document.delete({ where: { id } });
-
   return NextResponse.json({ success: true });
 }
