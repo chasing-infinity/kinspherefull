@@ -62,25 +62,28 @@ export async function POST(req: NextRequest) {
 
   const conversationHistory = ((history ?? []) as { role: string; message: string }[])
     .reverse()
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.message }));
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.message }],
+    }));
 
-  const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 400,
-      system: SYSTEM_PROMPT,
-      messages: conversationHistory,
-    }),
-  });
+  // Call Gemini API
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: conversationHistory,
+        generationConfig: { maxOutputTokens: 400, temperature: 0.8 },
+      }),
+    }
+  );
 
-  const aiData = await aiRes.json();
-  const reply: string = (aiData.content?.[0]?.text as string) ?? "I'm here. Take your time.";
+  const geminiData = await geminiRes.json();
+  const reply: string =
+    geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "I'm here. Take your time.";
 
   await supabase.from("listening_room_messages").insert({
     user_id: session.user.id,
