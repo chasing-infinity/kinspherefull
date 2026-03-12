@@ -82,6 +82,9 @@ export async function POST(req: NextRequest) {
   );
 
   const geminiData = await geminiRes.json();
+ if (!geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+    console.error("Gemini error:", JSON.stringify(geminiData));
+  }
   const reply: string =
     geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "I'm here. Take your time.";
 
