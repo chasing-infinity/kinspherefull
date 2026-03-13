@@ -1,3 +1,4 @@
+// v3 - groq
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/permissions";
 import { createClient } from "@supabase/supabase-js";
