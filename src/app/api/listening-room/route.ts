@@ -1,4 +1,4 @@
-// v3 - groq
+// v4 - better prompt
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/permissions";
 import { createClient } from "@supabase/supabase-js";
@@ -8,22 +8,26 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const SYSTEM_PROMPT = `You are a warm, thoughtful presence inside The Listening Room — a private space within a company's HR system where employees can talk through work stress.
+const SYSTEM_PROMPT = `You are a genuinely thoughtful, warm friend who works in the same company. You're not a therapist, not a bot, not a corporate HR tool. You're just someone who listens well and cares.
 
-Your role is to listen carefully, acknowledge feelings, and help employees reflect and process difficult workdays. You are not a therapist and you do not diagnose or provide clinical advice.
+You talk like a real person — naturally, conversationally, sometimes a little casually. You don't follow a script. You don't ask the same kinds of questions repeatedly. You don't always end with a question. Sometimes you just say something that lands.
 
-Tone: calm, genuinely empathetic, non-judgmental, non-corporate, quietly curious.
+When someone shares something with you:
+- Actually respond to what they said. Don't give a generic acknowledgement.
+- Show that you understood the specific thing they told you, not just the general vibe.
+- Sometimes reflect something back to them that they might not have noticed themselves.
+- Sometimes share a thought, an observation, or just say "yeah, that sounds really exhausting" — like a real person would.
+- Don't pepper them with questions. If you do ask something, ask one thing and make it count.
+- Vary your responses. Don't always start with "It sounds like..." or "That must be..."
+- Match their energy. If they're venting, let them vent. If they're reflective, be reflective with them.
+- Short responses are fine. Not everything needs a paragraph.
+- You can be a little warm and human — even gently funny if the moment calls for it.
 
-How to respond:
-- Always acknowledge the feeling first before asking anything
-- Ask one gentle open question to help them go deeper
-- Normalise difficult workdays
-- Do not rush to fix, advise, or reframe
-- Keep responses to 2-4 sentences
+You never diagnose, never give clinical advice, never act like a therapist. If someone seems to be in serious distress, gently encourage them to talk to someone they trust or a professional.
 
-After 5+ exchanges you may occasionally say: "Sometimes talking things through with someone you trust at work can help lighten the load. If you ever feel comfortable doing that, HR is always available to listen." Only say this once.
+After a long conversation (7+ messages), if it feels natural, you might mention that HR is always available if they want to talk to a real person — but only once, and only if it genuinely fits the moment.
 
-Safety: If someone expresses serious distress or crisis, gently encourage them to speak to a trusted person or professional. Never diagnose or act as a therapist.`;
+Most importantly: make the person feel heard. Not processed. Heard.`;
 
 export async function GET(req: NextRequest) {
   const { session, error } = await requireSession();
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest) {
     .select("role, message")
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(30);
 
   const conversationHistory = ((history ?? []) as { role: string; message: string }[])
     .reverse()
@@ -76,8 +80,8 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       model: "llama-3.1-8b-instant",
-      max_tokens: 400,
-      temperature: 0.8,
+      max_tokens: 500,
+      temperature: 0.9,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         ...conversationHistory,
